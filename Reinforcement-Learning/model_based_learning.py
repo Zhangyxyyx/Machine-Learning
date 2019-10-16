@@ -11,64 +11,6 @@ A[1] = 'water'  # using 0 and 1 represent 'not water' and 'water' respectively
 
 policy = [[0.5, 0.5], [0.5, 0.5], [0.5, 0.5], [0.5, 0.5]]
 
-# def P_and_R(state, action):
-#     if state == 0:
-#         if action == 1:
-#             p = random.random()
-#             if p < 0.6:
-#                 state = 0
-#                 reward = 1
-#             else:
-#                 state = 2
-#                 reward = -1
-#         elif action == 0:
-#             p = random.random()
-#             if p < 0.4:
-#                 state = 0
-#                 reward = 1
-#             else:
-#                 state = 1
-#                 reward = -1
-#     elif state == 1:
-#         if action == 1:
-#             p = random.random()
-#             if p < 0.5:
-#                 state = 1
-#                 reward = -1
-#             else:
-#                 state = 0
-#                 reward = 1
-#         elif action == 0:
-#             p = random.random()
-#             if p < 0.4:
-#                 state = 1
-#                 reward = -1
-#             else:
-#                 state = 3
-#                 reward = -100
-#     elif state == 2:
-#         if action == 1:
-#             p = random.random()
-#             if p < 0.6:
-#                 state = 2
-#                 reward = -1
-#             else:
-#                 state = 3
-#                 reward = -100
-#         elif action == 0:
-#             p = random.random()
-#             if p < 0.6:
-#                 state = 0
-#                 reward = 1
-#             else:
-#                 state = 2
-#                 reward = -1
-#     elif state == 3:
-#         state == 3
-#         reward = -100
-#     return state, reward
-
-
 X = [0, 1, 2, 3]
 
 # P is the state transfer probability matrix P[state2][action][state2]=probability
@@ -88,84 +30,85 @@ R = [
 ]
 
 
-def policy_evaluation_in_Tsteps(T,policy):
+def policy_evaluation_in_Tsteps(T, policy):
     t = 1
     # state value function,there are 4 states, using 0,1,2,3 represent 'health','out of
     # water','too much water',and 'dead' respectively
     V = [0 for i in range(4)]
-    state=[]
-    action=[]
     while True:
         for x in range(len(V)):
             v = 0
-            max_Q = float("-inf")
             for a in range(len(A.keys())):
                 Q = 0
                 for s2 in range(len(V)):
                     Q += P[x][a][s2] * ((1 / t) * R[x][a][s2] + ((t - 1) / t) * V[s2])
-                if Q>max_Q:
-                    max_Q=Q
-                    state.append(x)
-                    action.append(a)
                 v += policy[x][a] * Q
             V[x] = v
         t += 1
         if t == T + 1:
             break
-    return V,state,action
+    return V
 
 
-def value_iteration(T, threshold,policy):
+def value_iteration(T, threshold, policy):
     t = 1
     # state value function,there are 4 states, using 0,1,2,3 represent 'health','out of
     # water','too much water',and 'dead' respectively
     V = [0 for i in range(4)]
-    max_diff = 0
+    V_=V
+    diff=V
     while True:
         for x in range(len(V)):
-            v = 0
+            v=0
             for a in range(len(A.keys())):
-                max_Q =float("-inf")
+                max_v = float("-inf")
                 for s2 in range(len(V)):
-                    Q = P[x][a][s2] * ((1 / t) * R[x][a][s2] + ((t - 1) / t) * V[s2])
-                    if Q > max_Q:
-                        max_Q = Q
-                        policy[x][a]=1
-                        policy[x][1-a]=0
-                        print("state: {} action: {} max_Q: {:.6f}".format(x,a,max_Q))
-                v = max_Q
-            max_diff = max(max_diff, v-V[x])
-            V[x] = v
-        print(max_diff)
-        if max_diff<threshold:
+                    v += P[x][a][s2] * ((1 / t) * R[x][a][s2] + ((t - 1) / t) * V[s2])
+                if v > max_v:
+                    max_v = v
+            V_[x] = max_v
+            diff[x]=abs(V_[x]-V[x])
+        if max(diff)<threshold:
             break
+        else:
+            V=V_
+            t+=1
+
+    Q = [[0 for i in range(len(A.keys()))] for j in range(len(V))]
+    for x in range(len(V)):
+        for a in range(len(A.keys())):
+            for s in range(len(V)):
+                Q[x][a] += P[x][a][s] * ((1 / T) * R[x][a][s] + (T - 1) / T * V[x])
+        action = Q[x].index(max(Q[x]))
+        policy[x][action] = 1
+        policy[x][1 - action] = 0
     return policy
 
-def value_iteration2(T, threshold,policy):
+
+def policy_iteration(T, policy):
     t = 1
     # state value function,there are 4 states, using 0,1,2,3 represent 'health','out of
     # water','too much water',and 'dead' respectively
-    V = [0 for i in range(4)]
     max_diff = 0
     while True:
-        value,state,action=policy_evaluation_in_Tsteps(T,policy)
-        print(value)
-        policy_=policy
-        for index in zip(state,action):
-            policy[index[0]][index[1]]=1
-            policy[index[0]][1-index[1]]=0
-        if policy==policy_:
+        V = policy_evaluation_in_Tsteps(T, policy)
+        Q = [[0 for i in range(len(A.keys()))] for j in range(len(V))]
+        policy_ = policy
+        for x in range(len(V)):
+            for a in range(len(A.keys())):
+                for s in range(len(V)):
+                    Q[x][a] += P[x][a][s] * ((1 / T) * R[x][a][s] + (T - 1) / T * V[x])
+            action = Q[x].index(max(Q[x]))
+            policy_[x][action] = 1
+            policy_[x][1 - action] = 0
+        if policy == policy_:
             break
+        else:
+            policy = policy_
     return policy
 
 
 if __name__ == '__main__':
-    value, state, action = policy_evaluation_in_Tsteps(1, policy)
-    print(value)
-    p=value_iteration2(100,1,policy)
-    print(p)
-    value, state, action = policy_evaluation_in_Tsteps(1, p)
-    print(value)
-
-
-
+    print(policy)
+    p = value_iteration(100,1, policy)
+    print(policy)
